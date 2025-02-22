@@ -10,17 +10,28 @@ def generate_launch_description():
     launch_file_dir = os.path.join(get_package_share_directory('turtlebot3_gazebo'), 'launch')
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
 
-    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
-    x_pose = LaunchConfiguration('x_pose', default='-2.0')
-    y_pose = LaunchConfiguration('y_pose', default='-0.5')
+    TURTLEBOT3_MODEL = os.environ['TURTLEBOT3_MODEL']
+    world_folder = TURTLEBOT3_MODEL
+    world_path = os.path.join(
+        get_package_share_directory('paveway_sim'),
+        'worlds',
+        world_folder,
+        'paveway_world.world'
+    )
 
-    world = os.path.join(get_package_share_directory('paveway_sim'), 'worlds', 'paveway_world.world')
+    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
+    x_pose = LaunchConfiguration('x_pose', default='-0.6')
+    y_pose = LaunchConfiguration('y_pose', default='0.5')
+
+    if TURTLEBOT3_MODEL == "waffle":
+        x_pose = '-1.5'
+        y_pose = '-1.5'
 
     gzserver_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')
         ),
-        launch_arguments={'world': world}.items()
+        launch_arguments={'world': world_path}.items()
     )
 
     gzclient_cmd = IncludeLaunchDescription(
