@@ -1,6 +1,7 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -18,6 +19,11 @@ def generate_launch_description():
         world_folder,
         'paveway_world.world'
     )
+
+    rviz_config = os.path.join(
+        get_package_share_directory('paveway_sim'),
+        'rviz',
+        'model.rviz')
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
     x_pose = LaunchConfiguration('x_pose', default='-0.6')
@@ -57,9 +63,18 @@ def generate_launch_description():
         }.items()
     )
 
+    rviz2_cmd = Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz_config],
+            output='screen'
+    )
+
     return LaunchDescription([
         gzserver_cmd, 
         gzclient_cmd, 
         robot_state_publisher_cmd, 
-        spawn_turtlebot_cmd
+        spawn_turtlebot_cmd,
+        rviz2_cmd
     ])
