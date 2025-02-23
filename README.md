@@ -4,20 +4,6 @@ PaveWay is an autonomous pothole detection and mapping robot based on the Turtle
 
 ## Workspace Setup
 
-### Installing Dependencies
-
-PaveWay relies on the TurtleBot3 ROS 2 packages. To install the required dependencies, run the following commands:
-
-```sh
-mkdir -p ~/turtlebot3_ws/src
-cd ~/turtlebot3_ws/src/
-git clone -b humble https://github.com/ROBOTIS-GIT/DynamixelSDK.git
-git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git
-git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3.git
-git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
-cd ~/turtlebot3_ws && colcon build --symlink-install
-```
-
 ### Building the PaveWay Workspace
 
 After cloning the PaveWay repository, build the workspace with:
@@ -27,13 +13,35 @@ cd ~/paveway_ws
 colcon build --symlink-install
 ```
 
-## Running the Simulation
+### Sourcing the Workspace
 
-To launch the PaveWay simulation, use the following command:
+After building the workspace, source and define Turtlebot model:
 
 ```sh
-export TURTLEBOT3_MODEL="burger"
+source install/setup.bash #or setup.zsh
+export TURTLEBOT3_MODEL="burger" # or "waffle"
+```
+
+## Running the Packages
+
+### Running Gazebo Simulation
+
+```sh
 ros2 launch paveway_sim paveway_sim.launch.py
+```
+
+### Running Navigation Node
+
+```sh
+ros2 launch paveway_nav paveway_nav.launch.py
+```
+
+### Running Server Node
+
+After running the server node, the web dashboard can be found at [Foxglove](https://app.foxglove.dev/ecte351/view)
+
+```sh
+ros2 launch paveway_web paveway_web.launch.py
 ```
 
 ## Repository Structure
@@ -42,9 +50,10 @@ ros2 launch paveway_sim paveway_sim.launch.py
 📂 paveway_ws
 ├── 📂 src
 │   ├── 📂 paveway_sim
-│   ├── 📂 paveway_navigation
-│   ├── 📂 paveway_detection
+│   ├── 📂 paveway_nav
+│   ├── 📂 paveway_vision
 │   ├── 📂 paveway_web
+│   ├── 📂 paveway_launch
 │   └── ...
 └── colcon.meta
 ```
