@@ -61,18 +61,18 @@ def generate_launch_description():
         }.items()
     )
 
-    # rviz2_cmd = Node(
-    #         package='rviz2',
-    #         executable='rviz2',
-    #         name='rviz2',
-    #         arguments=['-d', rviz_config],
-    #         output='screen'
-    # )
+    rviz2_cmd = Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz_config],
+            output='screen'
+    )
 
     return LaunchDescription([
         gzserver_cmd, 
         gzclient_cmd, 
         robot_state_publisher_cmd, 
         spawn_turtlebot_cmd,
-        # rviz2_cmd
+        rviz2_cmd
     ])
