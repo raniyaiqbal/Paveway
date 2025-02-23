@@ -12,12 +12,10 @@ def generate_launch_description():
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
 
     TURTLEBOT3_MODEL = os.environ['TURTLEBOT3_MODEL']
-    world_folder = TURTLEBOT3_MODEL
     world_path = os.path.join(
         get_package_share_directory('paveway_sim'),
         'worlds',
-        world_folder,
-        'paveway_world.world'
+        f'{TURTLEBOT3_MODEL}.world'
     )
 
     rviz_config = os.path.join(
