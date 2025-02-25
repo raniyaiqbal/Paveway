@@ -17,6 +17,7 @@ class PotholeDetector(Node):
         self.subscription = self.create_subscription(
             Image, '/camera/image_raw', self.image_callback, 10)
         self.publisher = self.create_publisher(PointStamped, '/pothole_coords', 10)
+        self.annotated_image_pub = self.create_publisher(Image, '/camera/pothole_annotated', 10)
 
         # TF2 Buffer and Listener
         self.tf_buffer = tf2_ros.Buffer()
@@ -26,10 +27,10 @@ class PotholeDetector(Node):
         self.detected_potholes = set()  # Store detected potholes
         self.get_logger().info("Pothole Detector Node Initialized.")
 
-    def is_new_pothole(self, x, y, threshold=0.2):  # Adjust threshold for real-world scale
+    def is_new_pothole(self, x, y, threshold=0.2):
         for px, py in self.detected_potholes:
             if abs(px - x) < threshold and abs(py - y) < threshold:
-                return False  # Pothole is already detected
+                return False
         return True
 
     def image_callback(self, msg):
@@ -57,6 +58,9 @@ class PotholeDetector(Node):
             for contour in contours:
                 area = cv2.contourArea(contour)
                 if area > 500:  # Filter out small noise
+                    x, y, w, h = cv2.boundingRect(contour)
+                    cv2.rectangle(cv_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
                     # Compute centroid of the pothole
                     M = cv2.moments(contour)
                     if M["m00"] != 0:
@@ -70,7 +74,6 @@ class PotholeDetector(Node):
                         pothole_3D_robot = self.transform_to_robot_frame(pothole_3D_camera)
 
                         if pothole_3D_robot and self.is_new_pothole(pothole_3D_robot.x, pothole_3D_robot.y):
-                            # Add to detected potholes list
                             self.detected_potholes.add((pothole_3D_robot.x, pothole_3D_robot.y))
 
                             # Publish the pothole coordinates
@@ -82,13 +85,30 @@ class PotholeDetector(Node):
                             self.publisher.publish(pothole_msg)
                             self.get_logger().info(f"Published New Pothole: x={pothole_3D_robot.x}, y={pothole_3D_robot.y}")
 
+            # Convert annotated image to ROS format
+            annotated_msg = self.bridge.cv2_to_imgmsg(cv_image, encoding="bgr8")
+
+            # Copy the original header (preserves timestamp)
+            annotated_msg.header = msg.header  
+
+            # Ensure a valid timestamp if missing
+            if annotated_msg.header.stamp.sec == 0 and annotated_msg.header.stamp.nanosec == 0:
+                annotated_msg.header.stamp = self.get_clock().now().to_msg()
+
+            # ✅ Set the correct frame_id
+            annotated_msg.header.frame_id = "camera_rgb_frame"
+
+            # Publish the annotated image
+            self.annotated_image_pub.publish(annotated_msg)
+
+
         except Exception as e:
             self.get_logger().error(f"Error processing image: {str(e)}")
 
     def image_to_camera_coords(self, cx, cy):
-        Z = 1.5 
-        fx, fy = 600.0, 600.0  # TODO: Camera focal lengths (change based on your camera)
-        cx_offset, cy_offset = 320.0, 240.0  # TODO: Image center (change based on camera)
+        Z = 1.5
+        fx, fy = 600.0, 600.0  # TODO: Update with actual camera intrinsics
+        cx_offset, cy_offset = 320.0, 240.0  # TODO: Update with actual image center
 
         X = (cx - cx_offset) * Z / fx
         Y = (cy - cy_offset) * Z / fy
@@ -112,14 +132,12 @@ class PotholeDetector(Node):
             self.get_logger().warn(f"TF2 transform failed: {e}")
             return None
 
-
 def main(args=None):
     rclpy.init(args=args)
     node = PotholeDetector()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
