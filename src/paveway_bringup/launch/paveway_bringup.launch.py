@@ -1,34 +1,72 @@
 import os
-from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, SetEnvironmentVariable
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+
 from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+TURTLEBOT3_MODEL = os.environ.get('TURTLEBOT3_MODEL', 'burger')
+
 
 def generate_launch_description():
-    set_turtlebot_model = SetEnvironmentVariable('TURTLEBOT3_MODEL', 'burger')
+    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+    use_rviz = LaunchConfiguration('use_rviz', default='true')
+    map_dir = LaunchConfiguration(
+        'map',
+        default=os.path.join(
+            get_package_share_directory('paveway_nav'),
+            'maps',
+            'real_map.yaml'))
 
-    paveway_nav_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('paveway_nav'), 'launch', 'paveway_nav.launch.py')
-        ),
-        launch_arguments={'physical_env': 'true'}.items()
-    )
-    
-    paveway_web_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('paveway_web'), 'launch', 'paveway_web.launch')
-        )
-    )
-    
-    paveway_vision_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('paveway_vision'), 'launch', 'paveway_vision.launch.py')
-        )
-    )
-    
+    param_file_name = TURTLEBOT3_MODEL + '.yaml'
+    param_dir = LaunchConfiguration(
+        'params_file',
+        default=os.path.join(
+            get_package_share_directory('paveway_nav'),
+            'params',
+            param_file_name))
+
+    nav2_launch_file_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
+
+    rviz_config_dir = os.path.join(
+        get_package_share_directory('nav2_bringup'),
+        'rviz',
+        'nav2_default_view.rviz')
+
     return LaunchDescription([
-        set_turtlebot_model,
-        paveway_nav_launch,
-        paveway_web_launch,
-        paveway_vision_launch
+        DeclareLaunchArgument(
+            'map',
+            default_value=map_dir,
+            description='Full path to map file to load'),
+
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=param_dir,
+            description='Full path to param file to load'),
+
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation (Gazebo) clock if true'),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([nav2_launch_file_dir, '/bringup_launch.py']),
+            launch_arguments={
+                'map': map_dir,
+                'use_sim_time': use_sim_time,
+                'params_file': param_dir}.items(),
+        ),
+
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz_config_dir],
+            parameters=[{'use_sim_time': use_sim_time}],
+            condition=IfCondition(use_rviz),
+            output='screen'),
     ])
