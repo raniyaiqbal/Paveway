@@ -107,4 +107,25 @@ def generate_launch_description():
                     ['"', namespace, '/base_footprint"'])}],
             arguments=['-i', usb_port],
             output='screen'),
+            
+        Node(
+            package='v4l2_camera',
+            executable='v4l2_camera_node',
+            name='camera',
+            parameters=[{
+            	'image_size': [640, 480],
+            	'output_encoding': 'yuv422_yuy2',
+            	'camera_info_url': 'file:///home/turtle/camera_calibration.yaml',
+            	'frame_id': 'camera',	
+            }],
+            output='screen'
+        ),
+        
+        Node(
+           package='tf2_ros',
+           executable='static_transform_publisher',
+           name='camera_tf_publisher',
+           arguments=['0.1', '0.0', '0.1', '0.0', '0.0', '0.0', 'base_link', 'camera'],
+           output='screen'
+        )
     ])
