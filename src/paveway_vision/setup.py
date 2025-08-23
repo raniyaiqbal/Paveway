@@ -20,7 +20,9 @@ setup(
     entry_points={
         'console_scripts': [
             'yolov8 = paveway_vision.yolov8:main',
-            'video_publisher = paveway_vision.video_publisher:main'
+            'hsv = paveway_vision.red_object_detector:main',
+            'video_publisher = paveway_vision.video_publisher:main',
+            'object_mapper = paveway_vision.object_mapper:main'
         ],
     },
 )

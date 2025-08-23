@@ -22,6 +22,7 @@ setup(
             'battery_publisher = paveway_web.battery_publisher:main',
             'distance_publisher = paveway_web.distance_publisher:main',
             'time_publisher = paveway_web.time_publisher:main',
+            'count_publisher = paveway_web.count_publisher:main'
         ],
     },
 )

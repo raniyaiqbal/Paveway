@@ -4,8 +4,9 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.actions import TimerAction, DeclareLaunchArgument
+from launch.conditions import LaunchConfigurationEquals
 
 def generate_launch_description():
     launch_file_dir = os.path.join(get_package_share_directory('turtlebot3_gazebo'), 'launch')
@@ -61,12 +62,42 @@ def generate_launch_description():
         }.items()
     )
 
-    rviz2_cmd = Node(
+    joint_state_publisher_cmd = Node(
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        name='joint_state_publisher',
+        output='screen'
+    )
+
+    rviz2_cmd = TimerAction(
+        period=5.0,
+        actions=[Node(
             package='rviz2',
             executable='rviz2',
             name='rviz2',
             arguments=['-d', rviz_config],
             output='screen'
+        )]
+    )
+
+    amcl_node = Node(
+        package='nav2_amcl',
+        executable='amcl',
+        name='amcl',
+        output='screen',
+        parameters=[os.path.join(
+            get_package_share_directory('paveway_sim'),
+            'config',
+            'amcl_params.yaml'
+        )]
+    )
+
+    slam_node = Node(
+        package='slam_toolbox',
+        executable='sync_slam_toolbox_node',
+        name='slam_toolbox',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
     )
 
     return LaunchDescription([
@@ -74,5 +105,8 @@ def generate_launch_description():
         gzclient_cmd, 
         robot_state_publisher_cmd, 
         spawn_turtlebot_cmd,
-        rviz2_cmd
+        joint_state_publisher_cmd,
+        rviz2_cmd,
+        amcl_node,
+        slam_node
     ])

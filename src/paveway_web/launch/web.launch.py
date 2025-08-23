@@ -24,6 +24,12 @@ def generate_launch_description():
             name='time_publisher',
             output='screen'
         ),
+         Node(
+            package='paveway_web', 
+            executable='count_publisher',
+            name='count_publisher',
+            output='screen'
+        ),
         
         ExecuteProcess(
             cmd=['ros2', 'launch', 'rosbridge_server', 'rosbridge_websocket_launch.xml'],
