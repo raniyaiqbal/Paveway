@@ -9,6 +9,8 @@ setup(
     data_files=[
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/vision.launch.py']),
+        ('share/' + package_name + '/models', ['models/v8.pt']),
+        ('share/' + package_name, ['angle-2.avi']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

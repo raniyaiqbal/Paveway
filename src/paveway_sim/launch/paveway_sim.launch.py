@@ -4,15 +4,15 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration
 from launch.actions import TimerAction, DeclareLaunchArgument
-from launch.conditions import LaunchConfigurationEquals
+from launch.conditions import IfCondition
 
 def generate_launch_description():
     launch_file_dir = os.path.join(get_package_share_directory('turtlebot3_gazebo'), 'launch')
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
 
-    TURTLEBOT3_MODEL = os.environ['TURTLEBOT3_MODEL']
+    TURTLEBOT3_MODEL = os.environ.get('TURTLEBOT3_MODEL', 'waffle')
     world_path = os.path.join(
         get_package_share_directory('paveway_sim'),
         'worlds',
@@ -80,33 +80,27 @@ def generate_launch_description():
         )]
     )
 
-    amcl_node = Node(
-        package='nav2_amcl',
-        executable='amcl',
-        name='amcl',
-        output='screen',
-        parameters=[os.path.join(
-            get_package_share_directory('paveway_sim'),
-            'config',
-            'amcl_params.yaml'
-        )]
-    )
-
+    # Mapping mode only. For navigation, paveway_nav starts AMCL against a saved
+    # map; running slam_toolbox at the same time would publish a second,
+    # conflicting map -> odom transform.
+    slam = LaunchConfiguration('slam')
     slam_node = Node(
         package='slam_toolbox',
         executable='sync_slam_toolbox_node',
         name='slam_toolbox',
         output='screen',
-        parameters=[{'use_sim_time': True}]
+        parameters=[{'use_sim_time': True}],
+        condition=IfCondition(slam)
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument('slam', default_value='false',
+                              description='Run slam_toolbox to build a new map'),
         gzserver_cmd, 
         gzclient_cmd, 
         robot_state_publisher_cmd, 
         spawn_turtlebot_cmd,
         joint_state_publisher_cmd,
         rviz2_cmd,
-        amcl_node,
         slam_node
     ])

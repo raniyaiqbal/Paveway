@@ -12,7 +12,7 @@ class RedObjectDetector(Node):
         super().__init__('red_object_detector')
         self.subscription = self.create_subscription(
             Image, '/camera/image_raw', self.image_callback, 10)
-        self.publisher = self.create_publisher(Detection2DArray, '/red_objects', 10)
+        self.publisher = self.create_publisher(Detection2DArray, '/pothole_detections', 10)
         self.bridge = CvBridge()
         
         # Red color thresholds (HSV space)

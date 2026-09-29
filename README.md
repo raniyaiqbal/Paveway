@@ -6,10 +6,13 @@ PaveWay is an autonomous pothole detection and mapping robot based on the Turtle
 
 ### Building the PaveWay Workspace
 
-After cloning the PaveWay repository, build the workspace with:
+After cloning the PaveWay repository, install the dependencies (TurtleBot3, Nav2, Gazebo, etc.) and build the workspace with:
 
 ```sh
 cd ~/paveway_ws
+sudo apt install ros-$ROS_DISTRO-turtlebot3* ros-$ROS_DISTRO-nav2-bringup
+rosdep install --from-paths src --ignore-src -y
+pip install ultralytics
 colcon build --symlink-install
 ```
 
@@ -41,7 +44,7 @@ ros2 launch paveway_nav paveway_nav.launch.py
 After running the server node, the web dashboard can be found at [Foxglove](https://app.foxglove.dev/ecte351/view)
 
 ```sh
-ros2 launch paveway_web paveway_web.launch.py
+ros2 launch paveway_web web.launch.py
 ```
 
 ## Repository Structure
@@ -53,7 +56,7 @@ ros2 launch paveway_web paveway_web.launch.py
 │   ├── 📂 paveway_nav
 │   ├── 📂 paveway_vision
 │   ├── 📂 paveway_web
-│   ├── 📂 paveway_launch
+│   ├── 📂 paveway_bringup
 │   └── ...
 └── colcon.meta
 ```

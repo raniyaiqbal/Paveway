@@ -1,98 +1,82 @@
-from ultralytics import YOLO
+#!/usr/bin/env python3
+"""YOLOv8 pothole detector: sensor_msgs/Image -> vision_msgs/Detection2DArray."""
 import os
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image
-from std_msgs.msg import Int32
-from vision_msgs.msg import Detection2DArray, Detection2D, BoundingBox2D
-from cv_bridge import CvBridge
-import math
 
-bridge = CvBridge()
+import rclpy
+from ament_index_python.packages import get_package_share_directory
+from cv_bridge import CvBridge
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import Image
+from vision_msgs.msg import BoundingBox2D, Detection2D, Detection2DArray, ObjectHypothesisWithPose
+from ultralytics import YOLO
+
 
 class PotholeDetector(Node):
     def __init__(self):
         super().__init__('pothole_detector')
-        
-        # YOLOv8 Model
-        self.model = YOLO(os.environ['HOME'] + '/paveway_ws/src/paveway_vision/models/v8.pt')
-        
-        # Subscribers
-        self.subscription = self.create_subscription(
-            Image,
-            '/image_raw',  # Remap in launch file if needed
-            self.image_callback,
-            10
-        )
-        
-        # Publishers
-        self.detection_pub = self.create_publisher(Detection2DArray, '/red_objects', 10)  # Same as red_object_detector
+        default_model = os.path.join(get_package_share_directory('paveway_vision'), 'models', 'v8.pt')
+        p = self.declare_parameter
+        model_path = os.path.expanduser(p('model_path', default_model).value)
+        self.conf = p('confidence', 0.5).value
+        self.frame_id = p('frame_id', '').value  # '' = keep the image's frame_id
+        self.default_frame = p('default_frame', 'camera_rgb_optical_frame').value
+        self.publish_annotated = p('publish_annotated', True).value
+        image_topic = p('image_topic', '/image_raw').value
+
+        self.model = YOLO(model_path)
+        self.bridge = CvBridge()
+        self.create_subscription(Image, image_topic, self.image_callback, qos_profile_sensor_data)
+        self.detection_pub = self.create_publisher(Detection2DArray, '/pothole_detections', 10)
         self.visualization_pub = self.create_publisher(Image, '/inference_result', 1)
-        # self.count_pub = self.create_publisher(Int32, '/pothole_count', 1)
-        
-        # Tracking
-        self.detected_potholes = []
-        self.detection_threshold = 50  # pixels
-        self.marker_id = 0
+        self.get_logger().info(f'Loaded {model_path}; listening on {image_topic}')
 
-    # def is_new_pothole(self, center):
-    #     for existing in self.detected_potholes:
-    #         if math.dist(center, existing) < self.detection_threshold:
-    #             return False
-    #     return True
-
-    def image_callback(self, msg):
+    def image_callback(self, msg: Image):
         try:
-            # Convert and process image
-            cv_image = bridge.imgmsg_to_cv2(msg, 'bgr8')
-            results = self.model(cv_image, conf=0.5)
-            
-            # Prepare Detection2DArray (identical to red_object_detector.py)
-            detections = Detection2DArray()
-            detections.header = msg.header
-            detections.header.frame_id = 'camera_rgb_optical_frame'  # Must match URDF!
-            
-            current_detections = []
-            
-            for result in results:
-                for box in result.boxes:
-                    b = box.xyxy[0].cpu().numpy()  # [x1,y1,x2,y2]
-                    
-                    # Calculate centroid (same as red detector)
-                    center_x = (b[0] + b[2]) / 2
-                    center_y = (b[1] + b[3]) / 2
-                    
-                    # if self.is_new_pothole((center_x, center_y)):
-                    #     self.detected_potholes.append((center_x, center_y))
-                    #     current_detections.append((center_x, center_y))
-                    
-                    # Create identical Detection2D message
-                    detection = Detection2D()
-                    bbox = BoundingBox2D()
-                    bbox.center.position.x = float(center_x)
-                    bbox.center.position.y = float(center_y)
-                    bbox.size_x = float(b[2] - b[0])
-                    bbox.size_y = float(b[3] - b[1])
-                    detection.bbox = bbox
-                    detections.detections.append(detection)
-            
-            # Publish (same topics as red_object_detector)
-            self.detection_pub.publish(detections)
-            # self.count_pub.publish(Int32(data=len(current_detections)))
-            
-            # Optional visualization
-            annotated = results[0].plot()
-            self.visualization_pub.publish(bridge.cv2_to_imgmsg(annotated, 'bgr8'))
-            
-        except Exception as e:
-            self.get_logger().error(f'Detection error: {str(e)}')
+            frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
+            result = self.model(frame, conf=self.conf, verbose=False)[0]
+        except Exception as e:  # keep the node alive on a bad frame
+            self.get_logger().error(f'Detection error: {e}', throttle_duration_sec=2.0)
+            return
 
-def main():
-    rclpy.init()
+        out = Detection2DArray()
+        out.header = msg.header
+        out.header.frame_id = self.frame_id or msg.header.frame_id or self.default_frame
+
+        for box in result.boxes:
+            x1, y1, x2, y2 = (float(v) for v in box.xyxy[0].cpu().numpy())
+            det = Detection2D()
+            det.header = out.header
+            det.bbox = BoundingBox2D()
+            det.bbox.center.position.x = (x1 + x2) / 2.0
+            det.bbox.center.position.y = (y1 + y2) / 2.0
+            det.bbox.size_x = x2 - x1
+            det.bbox.size_y = y2 - y1
+            hyp = ObjectHypothesisWithPose()
+            hyp.hypothesis.class_id = result.names[int(box.cls[0])]
+            hyp.hypothesis.score = float(box.conf[0])
+            det.results.append(hyp)
+            out.detections.append(det)
+
+        self.detection_pub.publish(out)
+        if self.publish_annotated and self.visualization_pub.get_subscription_count() > 0:
+            annotated = self.bridge.cv2_to_imgmsg(result.plot(), 'bgr8')
+            annotated.header = msg.header
+            self.visualization_pub.publish(annotated)
+
+
+def main(args=None):
+    rclpy.init(args=args)
     node = PotholeDetector()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
